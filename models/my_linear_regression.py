@@ -337,25 +337,178 @@ def convert_time(value):
 df["Departure_Time"] = df["Departure_Time"].apply(convert_time)
 df["Arrival_Time"] = df["Arrival_Time"].apply(convert_time)
 
-print(df[["Departure_Time", "Arrival_Time"]].head(20))
-print(df["Departure_Time"].dtype)
-print(df["Arrival_Time"].dtype)
+
+# Convert time into cyclical features
+df["Departure_Time_Sin"] = np.sin(
+    2 * np.pi * df["Departure_Time"] / 1440
+)
+
+df["Departure_Time_Cos"] = np.cos(
+    2 * np.pi * df["Departure_Time"] / 1440
+)
+
+df["Arrival_Time_Sin"] = np.sin(
+    2 * np.pi * df["Arrival_Time"] / 1440
+)
+
+df["Arrival_Time_Cos"] = np.cos(
+    2 * np.pi * df["Arrival_Time"] / 1440
+)
 
 
-print(df[
-    [
-        "Price",
-        "Distance_km",
-        "Duration",
-        "Total_Stops",
-        "Passenger_Count",
-        "Days_Before_Departure",
-        "Departure_Time",
-        "Arrival_Time"
-    ]
-].info())
+# Convert departure date to datetime
+df["Departure_Date"] = pd.to_datetime(
+    df["Departure_Date"],
+    errors="coerce"
+)
 
-print(df.isnull().sum())
+# Extract useful date information
+df["Departure_Year"] = df["Departure_Date"].dt.year
+df["Departure_Month"] = df["Departure_Date"].dt.month
+df["Departure_Day"] = df["Departure_Date"].dt.day
+df["Departure_DayOfYear"] = df["Departure_Date"].dt.dayofyear
+
+
+
+# print(df[["Departure_Time", "Arrival_Time"]].head(20))
+# print(df["Departure_Time"].dtype)
+# print(df["Arrival_Time"].dtype)
+
+
+# print(df[
+#     [
+#         "Price",
+#         "Distance_km",
+#         "Duration",
+#         "Total_Stops",
+#         "Passenger_Count",
+#         "Days_Before_Departure",
+#         "Departure_Time",
+#         "Arrival_Time"
+#     ]
+# ].info())
+
+# print(df.isnull().sum())
+
+
+### separating the dataset features X from the final reading y
+
+### from the reading (y), i am going to drop the rows that have the values as NAN, as they can't be used to train the model, because the model doesn't know what the actual value is for that particular one.
+
+df = df.dropna(subset=["Price"])
+
+
+### adding the cleaned data into a dedicated csv file
+
+cleaned_file_path = (
+    "multiple_linear_regression/AI-Travel-Analyst/data/"
+    "cleaned_flight_pricing_dataset.csv"
+)
+
+df.to_csv(cleaned_file_path, index=False)
+
+print("Cleaned dataset saved to:", cleaned_file_path)
+
+
+
+numeric_features = [
+    "Distance_km",
+    "Duration",
+    "Total_Stops",
+    "Passenger_Count",
+    "Days_Before_Departure",
+
+    "Departure_Time_Sin",
+    "Departure_Time_Cos",
+    "Arrival_Time_Sin",
+    "Arrival_Time_Cos",
+
+    "Departure_Year",
+    "Departure_Month",
+    "Departure_Day",
+    "Departure_DayOfYear"
+]
+
+
+### separating the dataset features X from the final reading y
+
+
+categorical_features = [
+    "Airline",
+    "Source",
+    "Destination",
+    "Travel_Class",
+    "Season",
+    "Weekday",
+    "Aircraft_Type",
+    "Booking_Channel"
+]
+
+X = df[numeric_features + categorical_features]
+y = df["Price"]
+
+
+# print(X.shape)
+# print(y.shape)          # confirmed that the shapes are true and correct, and that the features and the reading are separated correctly.
+
+from sklearn.model_selection import train_test_split
+
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X,
+    y,
+    test_size=0.2,
+    random_state=42
+)
+
+# print("X_train:", X_train.shape)
+# print("X_test:", X_test.shape)
+# print("y_train:", y_train.shape)
+# print("y_test:", y_test.shape)
+
+
+for column in numeric_features:
+    median_value = X_train[column].median()
+
+    X_train[column] = X_train[column].fillna(median_value)   # median is used because it is less sensitive to outliers compared to the mean, making it a more robust measure of central tendency for filling missing values in numeric features.
+    X_test[column] = X_test[column].fillna(median_value)     # same logic for using median, using the median for both test dataset and the training dataset
+
+# print(X_train[numeric_features].isnull().sum())
+# print(X_test[numeric_features].isnull().sum())      # shows that there are no rows that contain NAN values in them for the test set and the training set
+
+
+### now to handle the catagorical dataset, leaving them as is dangerous, so we assign the NANs as unknown
+
+for column in categorical_features:
+    X_train[column] = X_train[column].fillna("Unknown")
+    X_test[column] = X_test[column].fillna("Unknown")
+
+### now we use the one-hot-encoder for encoding these string values so that the model can understand them:
+
+from sklearn.preprocessing import OneHotEncoder
+
+encoder = OneHotEncoder(
+    handle_unknown="ignore",
+    sparse_output=False
+)
+
+X_train_cat = encoder.fit_transform(X_train[categorical_features])
+X_test_cat = encoder.transform(X_test[categorical_features])
+
+# print("Categorical training shape:", X_train_cat.shape)
+# print("Categorical testing shape:", X_test_cat.shape)     ## tells how many new features were made using the one-hot-encoder
+
+
+X_train_num = X_train[numeric_features].to_numpy()
+X_test_num = X_test[numeric_features].to_numpy()
+
+X_train_final = np.hstack([X_train_num, X_train_cat])
+X_test_final = np.hstack([X_test_num, X_test_cat])
+
+# print("X_train_final:", X_train_final.shape)
+# print("X_test_final:", X_test_final.shape)          ## added the 7 (numerical features) + 85 (categorical features) = 92 features in total
+
+
 
 
 
@@ -384,6 +537,8 @@ class MyLinearRegression:
         self.mean = np.mean(X, axis = 0)
         self.std = np.std(X, axis = 0)
 
+        self.std[self.std == 0] = 1  # Prevent division by zero for features with zero variance
+
         X = (X - self.mean) / self.std
 
         # repeting the process for number of epochs
@@ -399,7 +554,11 @@ class MyLinearRegression:
             self.w -= self.learning_rate * dw
             self.b -= self.learning_rate * db
 
-            cost = np.mean(error ** 2)
+            # Calculate cost using the updated parameters
+            new_prediction = X @ self.w + self.b
+            new_error = new_prediction - y
+
+            cost = np.mean(new_error ** 2)
 
             self.costs.append(cost)
 
@@ -407,5 +566,63 @@ class MyLinearRegression:
         if self.w is None:
             raise ValueError("Model is not fitted yet. Please call the fit method before predicting.")
         X = (X - self.mean) / self.std
-        return X @ self.w + self.b
 
+        prediction = X @ self.w + self.b
+
+        return prediction
+
+model = MyLinearRegression(learning_rate = 0.01, epochs = 5000)
+
+model.fit(
+    X_train_final,
+    y_train.to_numpy().reshape(-1, 1)
+)
+
+print("Initial cost:", model.costs[0])
+print("Final cost:", model.costs[-1])
+
+predictions = model.predict(X_test_final)
+
+
+
+
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+
+predictions = predictions.ravel()
+
+mae = mean_absolute_error(y_test, predictions)
+rmse = np.sqrt(mean_squared_error(y_test, predictions))
+r2 = r2_score(y_test, predictions)
+
+print("MAE:", mae)
+print("RMSE:", rmse)
+print("R²:", r2)
+
+print("Minimum prediction:", predictions.min())
+print("Maximum prediction:", predictions.max())
+print("Negative predictions:", (predictions < 0).sum())
+
+baseline_predictions = np.full(
+    len(y_test),
+    y_train.mean()
+)
+
+baseline_rmse = np.sqrt(
+    mean_squared_error(y_test, baseline_predictions)
+)
+
+print("Baseline RMSE:", baseline_rmse)
+
+
+
+
+
+print(predictions[:10]) # Display the first 10 predictions
+
+
+plt.plot(model.costs)
+plt.grid()
+plt.xlabel("Epoch")
+plt.ylabel("Cost")
+plt.title("Training Cost")
+plt.show()
