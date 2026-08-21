@@ -2,63 +2,48 @@ import numpy as np
 from matplotlib import pyplot as plt
 import pandas as pd
 
-df = pd.read_csv("multiple_linear_regression/AI-Travel-Analyst/data/flight_pricing_dataset.csv")
 
-# print(df.info())
+# ============================================================
+# LOAD DATA
+# ============================================================
 
-# print(df.isnull().sum())
-
-# print(df.nunique())
-
-# print(df["Airline"].unique())
-
-# print(df["Total_Stops"].unique())
-
-# print(df["Distance_km"].head(10))
-
-# print(df["Duration"].head(10))
-
-# print(df["Price"].head(10))
-
-# print(df["Duration"].dropna().head(30).to_string())
-
-# print(df["Duration"].dropna().tail(30).to_string())
-
-# print(df["Price"].describe())
-
-# by running the above codes, we can see that:
-# Problem                     Example
-# ────────────────────────────────────────────
-# Missing values              NaN
-# Inconsistent capitalization Indigo / INDIGO / indigo
-# Inconsistent stops          1 / 1 stop
-# Mixed duration formats      1.67 / 3h 11m / 177 min
-# Numeric columns as strings  Price / Distance / Passenger_Count
-# Potential price cap         200000 occurs 8,989 times
-
-### This part of the code is to find the things that are different in all of the features, and then convert all to a single format, so that we can use them for our model training and testing.
-# print(df[df["Duration"].str.match(r"^\d+\.\d+$", na=False)][
-#     ["Duration", "Distance_km", "Price"]
-# ].head(20).to_string(index=False))
-
-# print(
-#     df[df["Duration"].str.contains("min", na=False)][
-#         ["Duration", "Distance_km", "Price"]
-#     ].head(20).to_string(index=False)
-# )
+df = pd.read_csv(
+    "multiple_linear_regression/AI-Travel-Analyst/data/flight_pricing_dataset.csv"
+)
 
 
-### converting the price section to a single format of float, so that we can use it for our model training and testing.
+# ============================================================
+# ORIGINAL DATA INFORMATION
+# ============================================================
+
+original_rows = len(df)
+
+original_airlines = df["Airline"].nunique(dropna=True)
+original_sources = df["Source"].nunique(dropna=True)
+original_destinations = df["Destination"].nunique(dropna=True)
+
+original_missing_values = df.isnull().sum().sum()
+
+
+# ============================================================
+# PRICE CLEANING
+# ============================================================
+
 df["Price"] = (
     df["Price"]
     .str.replace("Rs. ", "", regex=False)
     .str.replace(",", "", regex=False)
 )
 
-df["Price"] = pd.to_numeric(df["Price"], errors="coerce")
+df["Price"] = pd.to_numeric(
+    df["Price"],
+    errors="coerce"
+)
 
 
-### now to standerdise the distance feature, we will convert all the values to floating numbers
+# ============================================================
+# DISTANCE CLEANING
+# ============================================================
 
 df["Distance_km"] = (
     df["Distance_km"]
@@ -71,21 +56,26 @@ df["Distance_km"] = pd.to_numeric(
 )
 
 
-
-### now to convert the duration feature to a single format, we will convert all of them in minutes:
+# ============================================================
+# DURATION CLEANING
+# ============================================================
 
 def convert_duration(value):
+
     if pd.isna(value):
         return np.nan
 
     value = str(value).strip()
 
-    # Case 1: value is already in minutes
+    # Already in minutes
     if "min" in value:
-        return float(value.replace("min", "").strip())
+        return float(
+            value.replace("min", "").strip()
+        )
 
-    # Case 2: value is in hours and minutes
+    # Hours and minutes
     if "h" in value:
+
         parts = value.replace("m", "").split("h")
 
         hours = float(parts[0].strip())
@@ -93,44 +83,51 @@ def convert_duration(value):
 
         return hours * 60 + minutes
 
-    # Case 3: decimal hours
+    # Decimal hours
     return float(value) * 60
 
 
-df["Duration"] = df["Duration"].apply(convert_duration)
+df["Duration"] = df["Duration"].apply(
+    convert_duration
+)
 
 
-### now to converting the stops feature:
+# ============================================================
+# TOTAL STOPS CLEANING
+# ============================================================
 
 def stops(value):
+
     if pd.isna(value):
         return np.nan
 
     value = str(value).strip()
 
-    # Case 1: value contains "non-stop":
     if "non-stop" in value:
         return 0
 
-    # Case 2: value contains "1 stop":
     elif " stops" in value:
-        return float(value.replace(" stops", ""))
-    
-    # Case 3: value contains "2 stops":
+        return float(
+            value.replace(" stops", "")
+        )
+
     elif " stop" in value:
-        return float(value.replace(" stop", ""))
+        return float(
+            value.replace(" stop", "")
+        )
 
     else:
         return float(value)
 
 
-df["Total_Stops"] = df["Total_Stops"].apply(stops)
+df["Total_Stops"] = df["Total_Stops"].apply(
+    stops
+)
 
-# print(df["Total_Stops"].isnull().sum())   ** this is to check if we created any null values in the Total_Stops feature after converting it to a single format.
 
-
-
-### now to convert the passanger count to a single format:
+# ============================================================
+# PASSENGER COUNT CLEANING
+# ============================================================
 
 number_words = {
     "one": 1,
@@ -141,13 +138,14 @@ number_words = {
     "six": 6
 }
 
+
 def convert_passenger_count(value):
+
     if pd.isna(value):
         return np.nan
 
     value = str(value).strip()
 
-    # Convert number words to digits
     if value in number_words:
         return number_words[value]
 
@@ -158,38 +156,29 @@ def convert_passenger_count(value):
         return float(value)
 
 
-df["Passenger_Count"] = df["Passenger_Count"].apply(convert_passenger_count)
+df["Passenger_Count"] = df[
+    "Passenger_Count"
+].apply(convert_passenger_count)
 
 
+# ============================================================
+# AIRLINE CLEANING
+# ============================================================
 
-### now to see the airline feature:
-# print(df["Airline"].unique())
+df["Airline"] = (
+    df["Airline"]
+    .str.strip()
+    .str.lower()
+)
 
-# the above line of code shows that we have 40 unique types of airlines, but most of them are just capitalized varients of the same airline, so i will convert all of them to lowercase
-
-df["Airline"] = df["Airline"].str.strip().str.lower()
-
-# this leaves us with 13 unique airlines.
-
-### Now i am going to see all the other features all at once
-
-# print(df["Source"].unique())
-# print(df["Destination"].unique())
-# print(df["Travel_Class"].unique())
-# print(df["Season"].unique())
-# print(df["Weekday"].unique())
-# print(df["Aircraft_Type"].unique())
-# print(df["Booking_Channel"].unique())
+cleaned_airlines = df[
+    "Airline"
+].nunique(dropna=True)
 
 
-# print(df["Source"].nunique())
-# print(df["Destination"].nunique())
-
-# print(sorted(df["Source"].dropna().unique()))
-
-# print(sorted(df["Destination"].dropna().unique()))
-
-# the above line of code shows that Source and Destination contain the same 54 raw location representations, so i will make a single dictionary and apply it to both
+# ============================================================
+# LOCATION CLEANING
+# ============================================================
 
 location_mapping = {
     "Ahmedabad": "Ahmedabad",
@@ -266,45 +255,40 @@ location_mapping = {
 }
 
 
+df["Source"] = df["Source"].map(
+    location_mapping
+)
 
-df["Source"] = df["Source"].map(location_mapping)
-df["Destination"] = df["Destination"].map(location_mapping)
-
-# print(len(location_mapping))             # tells the number of raw location names
-
-# print(df["Source"].nunique())            # tells the number of unique location names if source
-# print(df["Destination"].nunique())       # tells the number of unique location names if destination
-
-
-### now i am checking the remaining columns and the values that it contains
-
-# print(df["Departure_Date"].head(20))
-# print(df["Departure_Time"].head(20))
-# print(df["Arrival_Time"].head(20))
-# print(df["Days_Before_Departure"].head(20))
-
-# print(df["Departure_Date"].unique()[:20])
-# print(df["Departure_Time"].unique()[:20])
-# print(df["Arrival_Time"].unique()[:20])
-# print(df["Days_Before_Departure"].unique()[:20])
+df["Destination"] = df["Destination"].map(
+    location_mapping
+)
 
 
+cleaned_sources = df[
+    "Source"
+].nunique(dropna=True)
 
-### changing the days_before_departure to a consistent format:
+cleaned_destinations = df[
+    "Destination"
+].nunique(dropna=True)
+
+
+# ============================================================
+# DAYS BEFORE DEPARTURE
+# ============================================================
 
 df["Days_Before_Departure"] = pd.to_numeric(
     df["Days_Before_Departure"],
     errors="coerce"
 )
 
-# print(df["Days_Before_Departure"].head(20))
-# print(df["Days_Before_Departure"].dtype)
 
-
-### now converting the timings:-
-
+# ============================================================
+# TIME CONVERSION
+# ============================================================
 
 def convert_time(value):
+
     if pd.isna(value):
         return np.nan
 
@@ -312,18 +296,24 @@ def convert_time(value):
 
     # 12-hour format
     if "AM" in value or "PM" in value:
+
         parts = value.split()
 
         time_part = parts[0]
         period = parts[1]
 
-        hour, minute = map(int, time_part.split(":"))
+        hour, minute = map(
+            int,
+            time_part.split(":")
+        )
 
         if period == "AM":
+
             if hour == 12:
                 hour = 0
 
         elif period == "PM":
+
             if hour != 12:
                 hour += 12
 
@@ -331,14 +321,28 @@ def convert_time(value):
 
     # 24-hour format
     else:
-        hour, minute = map(int, value.split(":"))
+
+        hour, minute = map(
+            int,
+            value.split(":")
+        )
+
         return hour * 60 + minute
 
-df["Departure_Time"] = df["Departure_Time"].apply(convert_time)
-df["Arrival_Time"] = df["Arrival_Time"].apply(convert_time)
+
+df["Departure_Time"] = df[
+    "Departure_Time"
+].apply(convert_time)
+
+df["Arrival_Time"] = df[
+    "Arrival_Time"
+].apply(convert_time)
 
 
-# Convert time into cyclical features
+# ============================================================
+# CYCLICAL TIME FEATURES
+# ============================================================
+
 df["Departure_Time_Sin"] = np.sin(
     2 * np.pi * df["Departure_Time"] / 1440
 )
@@ -356,60 +360,74 @@ df["Arrival_Time_Cos"] = np.cos(
 )
 
 
-# Convert departure date to datetime
+# ============================================================
+# DATE FEATURES
+# ============================================================
+
 df["Departure_Date"] = pd.to_datetime(
     df["Departure_Date"],
     errors="coerce"
 )
 
-# Extract useful date information
-df["Departure_Year"] = df["Departure_Date"].dt.year
-df["Departure_Month"] = df["Departure_Date"].dt.month
-df["Departure_Day"] = df["Departure_Date"].dt.day
-df["Departure_DayOfYear"] = df["Departure_Date"].dt.dayofyear
+df["Departure_Year"] = (
+    df["Departure_Date"].dt.year
+)
+
+df["Departure_Month"] = (
+    df["Departure_Date"].dt.month
+)
+
+df["Departure_Day"] = (
+    df["Departure_Date"].dt.day
+)
+
+df["Departure_DayOfYear"] = (
+    df["Departure_Date"].dt.dayofyear
+)
 
 
+# ============================================================
+# MISSING VALUES AFTER STANDARDIZATION
+# ============================================================
 
-# print(df[["Departure_Time", "Arrival_Time"]].head(20))
-# print(df["Departure_Time"].dtype)
-# print(df["Arrival_Time"].dtype)
-
-
-# print(df[
-#     [
-#         "Price",
-#         "Distance_km",
-#         "Duration",
-#         "Total_Stops",
-#         "Passenger_Count",
-#         "Days_Before_Departure",
-#         "Departure_Time",
-#         "Arrival_Time"
-#     ]
-# ].info())
-
-# print(df.isnull().sum())
+missing_after_standardization = (
+    df.isnull().sum().sum()
+)
 
 
-### separating the dataset features X from the final reading y
+# ============================================================
+# REMOVE ROWS WITH MISSING PRICE
+# ============================================================
 
-### from the reading (y), i am going to drop the rows that have the values as NAN, as they can't be used to train the model, because the model doesn't know what the actual value is for that particular one.
+df = df.dropna(
+    subset=["Price"]
+)
 
-df = df.dropna(subset=["Price"])
 
-
-### adding the cleaned data into a dedicated csv file
+# ============================================================
+# SAVE CLEANED DATASET
+# ============================================================
 
 cleaned_file_path = (
-    "multiple_linear_regression/AI-Travel-Analyst/data/"
+    "multiple_linear_regression/"
+    "AI-Travel-Analyst/data/"
     "cleaned_flight_pricing_dataset.csv"
 )
 
-df.to_csv(cleaned_file_path, index=False)
+df.to_csv(
+    cleaned_file_path,
+    index=False
+)
 
-print("Cleaned dataset saved to:", cleaned_file_path)
+print(
+    "Cleaned dataset saved to:",
+    cleaned_file_path
+)
 
 
+# ============================================================
+# FEATURE DEFINITIONS
+# ============================================================
 
 numeric_features = [
     "Distance_km",
@@ -430,9 +448,6 @@ numeric_features = [
 ]
 
 
-### separating the dataset features X from the final reading y
-
-
 categorical_features = [
     "Airline",
     "Source",
@@ -444,12 +459,17 @@ categorical_features = [
     "Booking_Channel"
 ]
 
-X = df[numeric_features + categorical_features]
+
+X = df[
+    numeric_features + categorical_features
+]
+
 y = df["Price"]
 
 
-# print(X.shape)
-# print(y.shape)          # confirmed that the shapes are true and correct, and that the features and the reading are separated correctly.
+# ============================================================
+# TRAIN / TEST SPLIT
+# ============================================================
 
 from sklearn.model_selection import train_test_split
 
@@ -461,81 +481,166 @@ X_train, X_test, y_train, y_test = train_test_split(
     random_state=42
 )
 
-# print("X_train:", X_train.shape)
-# print("X_test:", X_test.shape)
-# print("y_train:", y_train.shape)
-# print("y_test:", y_test.shape)
 
+# ============================================================
+# NUMERICAL MISSING VALUES
+# ============================================================
 
 for column in numeric_features:
-    median_value = X_train[column].median()
 
-    X_train[column] = X_train[column].fillna(median_value)   # median is used because it is less sensitive to outliers compared to the mean, making it a more robust measure of central tendency for filling missing values in numeric features.
-    X_test[column] = X_test[column].fillna(median_value)     # same logic for using median, using the median for both test dataset and the training dataset
+    median_value = X_train[
+        column
+    ].median()
 
-# print(X_train[numeric_features].isnull().sum())
-# print(X_test[numeric_features].isnull().sum())      # shows that there are no rows that contain NAN values in them for the test set and the training set
+    X_train[column] = (
+        X_train[column]
+        .fillna(median_value)
+    )
+
+    X_test[column] = (
+        X_test[column]
+        .fillna(median_value)
+    )
 
 
-### now to handle the catagorical dataset, leaving them as is dangerous, so we assign the NANs as unknown
+# ============================================================
+# CATEGORICAL MISSING VALUES
+# ============================================================
 
 for column in categorical_features:
-    X_train[column] = X_train[column].fillna("Unknown")
-    X_test[column] = X_test[column].fillna("Unknown")
 
-### now we use the one-hot-encoder for encoding these string values so that the model can understand them:
+    X_train[column] = (
+        X_train[column]
+        .fillna("Unknown")
+    )
+
+    X_test[column] = (
+        X_test[column]
+        .fillna("Unknown")
+    )
+
+
+# ============================================================
+# ONE-HOT ENCODING
+# ============================================================
 
 from sklearn.preprocessing import OneHotEncoder
+
 
 encoder = OneHotEncoder(
     handle_unknown="ignore",
     sparse_output=False
 )
 
-X_train_cat = encoder.fit_transform(X_train[categorical_features])
-X_test_cat = encoder.transform(X_test[categorical_features])
 
-# print("Categorical training shape:", X_train_cat.shape)
-# print("Categorical testing shape:", X_test_cat.shape)     ## tells how many new features were made using the one-hot-encoder
+X_train_cat = encoder.fit_transform(
+    X_train[categorical_features]
+)
 
-
-X_train_num = X_train[numeric_features].to_numpy()
-X_test_num = X_test[numeric_features].to_numpy()
-
-X_train_final = np.hstack([X_train_num, X_train_cat])
-X_test_final = np.hstack([X_test_num, X_test_cat])
-
-# print("X_train_final:", X_train_final.shape)
-# print("X_test_final:", X_test_final.shape)          ## added the 7 (numerical features) + 85 (categorical features) = 92 features in total
+X_test_cat = encoder.transform(
+    X_test[categorical_features]
+)
 
 
+# ============================================================
+# NUMERICAL FEATURES → NUMPY
+# ============================================================
+
+X_train_num = X_train[
+    numeric_features
+].to_numpy()
+
+X_test_num = X_test[
+    numeric_features
+].to_numpy()
 
 
+# ============================================================
+# COMBINE NUMERICAL + CATEGORICAL FEATURES
+# ============================================================
 
+X_train_final = np.hstack([
+    X_train_num,
+    X_train_cat
+])
+
+X_test_final = np.hstack([
+    X_test_num,
+    X_test_cat
+])
+
+
+# ============================================================
+# SCIKIT-LEARN LINEAR REGRESSION
+# ============================================================
 
 from sklearn.linear_model import LinearRegression
 
+
 model = LinearRegression()
-model.fit(X_train_final, y_train)
 
-predictions = model.predict(X_test_final)
+model.fit(
+    X_train_final,
+    y_train
+)
 
 
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+# ============================================================
+# PREDICTIONS
+# ============================================================
+
+predictions = model.predict(
+    X_test_final
+)
 
 predictions = predictions.ravel()
 
-mae = mean_absolute_error(y_test, predictions)
-rmse = np.sqrt(mean_squared_error(y_test, predictions))
-r2 = r2_score(y_test, predictions)
 
-print("MAE:", mae)
-print("RMSE:", rmse)
-print("R²:", r2)
+# ============================================================
+# MODEL METRICS
+# ============================================================
 
-print("Minimum prediction:", predictions.min())
-print("Maximum prediction:", predictions.max())
-print("Negative predictions:", (predictions < 0).sum())
+from sklearn.metrics import (
+    mean_absolute_error,
+    mean_squared_error,
+    r2_score
+)
+
+
+mse = mean_squared_error(
+    y_test,
+    predictions
+)
+
+rmse = np.sqrt(mse)
+
+mae = mean_absolute_error(
+    y_test,
+    predictions
+)
+
+r2 = r2_score(
+    y_test,
+    predictions
+)
+
+
+# ============================================================
+# PREDICTION ANALYSIS
+# ============================================================
+
+minimum_prediction = predictions.min()
+
+maximum_prediction = predictions.max()
+
+negative_predictions = (
+    predictions < 0
+).sum()
+
+
+# ============================================================
+# BASELINE
+# ============================================================
 
 baseline_predictions = np.full(
     len(y_test),
@@ -543,13 +648,159 @@ baseline_predictions = np.full(
 )
 
 baseline_rmse = np.sqrt(
-    mean_squared_error(y_test, baseline_predictions)
+    mean_squared_error(
+        y_test,
+        baseline_predictions
+    )
 )
 
-print("Baseline RMSE:", baseline_rmse)
+
+# ============================================================
+# FINAL SUMMARY
+# ============================================================
+
+print()
+print("=" * 60)
+print("                 DATA CLEANING SUMMARY")
+print("=" * 60)
+
+print(
+    f"Original rows                 : "
+    f"{original_rows}"
+)
+
+print(
+    f"Rows used for modelling       : "
+    f"{len(df)}"
+)
+
+print()
+
+print("Categorical cleaning:")
+
+print(
+    f"  Airlines                    : "
+    f"{original_airlines} -> {cleaned_airlines}"
+)
+
+print(
+    f"  Source locations            : "
+    f"{original_sources} -> {cleaned_sources}"
+)
+
+print(
+    f"  Destination locations       : "
+    f"{original_destinations} -> "
+    f"{cleaned_destinations}"
+)
+
+print()
+
+print("Numerical transformations:")
+
+print(
+    "  Price                       : "
+    "Rs. strings -> float"
+)
+
+print(
+    "  Distance_km                 : "
+    "'km' strings -> float"
+)
+
+print(
+    "  Duration                    : "
+    "mixed formats -> minutes"
+)
+
+print(
+    "  Total_Stops                 : "
+    "text -> number"
+)
+
+print(
+    "  Passenger_Count             : "
+    "words/numbers -> float"
+)
+
+print(
+    "  Days_Before_Departure       : "
+    "strings -> float"
+)
+
+print(
+    "  Departure_Time              : "
+    "mixed formats -> minutes"
+)
+
+print(
+    "  Arrival_Time                : "
+    "mixed formats -> minutes"
+)
+
+print()
+
+print("Missing values:")
+
+print(
+    f"  Original dataset             : "
+    f"{original_missing_values}"
+)
+
+print(
+    f"  After standardization        : "
+    f"{missing_after_standardization}"
+)
 
 
+print()
+print("=" * 60)
+print("                 MODEL PERFORMANCE")
+print("=" * 60)
 
+print(
+    f"MSE                           : "
+    f"{mse:.2f}"
+)
 
+print(
+    f"RMSE                          : "
+    f"{rmse:.2f}"
+)
 
-print(predictions[:10]) # Display the first 10 predictions
+print(
+    f"MAE                           : "
+    f"{mae:.2f}"
+)
+
+print(
+    f"R²                            : "
+    f"{r2:.4f}"
+)
+
+print(
+    f"Minimum prediction            : "
+    f"{minimum_prediction:.2f}"
+)
+
+print(
+    f"Maximum prediction            : "
+    f"{maximum_prediction:.2f}"
+)
+
+print(
+    f"Negative predictions          : "
+    f"{negative_predictions}"
+)
+
+print(
+    f"Baseline RMSE                 : "
+    f"{baseline_rmse:.2f}"
+)
+
+print("=" * 60)
+
+print()
+print("First 10 predictions:")
+
+print(predictions[:10])

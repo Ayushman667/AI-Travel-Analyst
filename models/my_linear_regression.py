@@ -389,27 +389,25 @@ df["Departure_DayOfYear"] = df["Departure_Date"].dt.dayofyear
 # print(df["Arrival_Time"].dtype)
 
 
-# print(df[
-#     [
-#         "Price",
-#         "Distance_km",
-#         "Duration",
-#         "Total_Stops",
-#         "Passenger_Count",
-#         "Days_Before_Departure",
-#         "Departure_Time",
-#         "Arrival_Time"
-#     ]
-# ].info())
+# Remove rows where target Price is missing
+df = df.dropna(subset=["Price"])
+
+
+# ============================================================
+# FINAL CLEANING STATISTICS
+# ============================================================
+
+cleaned_airlines = df["Airline"].nunique()
+cleaned_source = df["Source"].nunique()
+cleaned_destination = df["Destination"].nunique()
+
+remaining_missing = df.isnull().sum().sum()
+
 
 # print(df.isnull().sum())
 
 
 ### separating the dataset features X from the final reading y
-
-### from the reading (y), i am going to drop the rows that have the values as NAN, as they can't be used to train the model, because the model doesn't know what the actual value is for that particular one.
-
-df = df.dropna(subset=["Price"])
 
 
 ### adding the cleaned data into a dedicated csv file
@@ -647,8 +645,8 @@ print("  Departure_Time              : mixed formats -> minutes")
 print("  Arrival_Time                : mixed formats -> minutes")
 
 print("\nMissing values:")
-print(f"  Before cleaning             : {original_missing}")
-print(f"  After cleaning              : {remaining_missing}")
+print(f"  Original dataset                   : {original_missing}")
+print(f"  After standardization              : {remaining_missing}")
 
 print("\n")
 print("=" * 60)
