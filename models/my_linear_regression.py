@@ -522,7 +522,7 @@ X_test_final = np.hstack([X_test_num, X_test_cat])
 
 
 
-
+## This is my linear regression model that has the same cleaned data and the linear regression is done using the mathematical formulas
 
 
 
