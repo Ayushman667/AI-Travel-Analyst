@@ -4,6 +4,20 @@ import pandas as pd
 
 df = pd.read_csv("multiple_linear_regression/AI-Travel-Analyst/data/flight_pricing_dataset.csv")
 
+
+# ============================================================
+# ORIGINAL DATASET INFORMATION
+# ============================================================
+
+original_rows = len(df)
+
+original_airlines = df["Airline"].nunique()
+original_source = df["Source"].nunique()
+original_destination = df["Destination"].nunique()
+
+original_missing = df.isnull().sum().sum()
+
+
 # print(df.info())
 
 # print(df.isnull().sum())
@@ -571,7 +585,7 @@ class MyLinearRegression:
 
         return prediction
 
-model = MyLinearRegression(learning_rate = 0.01, epochs = 5000)
+model = MyLinearRegression(learning_rate = 0.01, epochs = 500)
 
 model.fit(
     X_train_final,
@@ -586,32 +600,68 @@ predictions = model.predict(X_test_final)
 
 
 
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+# ============================================================
+# MODEL EVALUATION
+# ============================================================
 
-predictions = predictions.ravel()
+predictions = model.predict(X_test_final).ravel()
+
+from sklearn.metrics import (
+    mean_absolute_error,
+    mean_squared_error,
+    r2_score
+)
 
 mae = mean_absolute_error(y_test, predictions)
-rmse = np.sqrt(mean_squared_error(y_test, predictions))
+mse = mean_squared_error(y_test, predictions)
+rmse = np.sqrt(mse)
 r2 = r2_score(y_test, predictions)
 
-print("MAE:", mae)
-print("RMSE:", rmse)
-print("R²:", r2)
+negative_predictions = np.sum(predictions < 0)
 
-print("Minimum prediction:", predictions.min())
-print("Maximum prediction:", predictions.max())
-print("Negative predictions:", (predictions < 0).sum())
+# ============================================================
+# FINAL OUTPUT
+# ============================================================
 
-baseline_predictions = np.full(
-    len(y_test),
-    y_train.mean()
-)
+print("\n")
+print("=" * 60)
+print("                 DATA CLEANING SUMMARY")
+print("=" * 60)
 
-baseline_rmse = np.sqrt(
-    mean_squared_error(y_test, baseline_predictions)
-)
+print(f"Original rows                 : {original_rows}")
+print(f"Rows used for modelling       : {len(df)}")
 
-print("Baseline RMSE:", baseline_rmse)
+print("\nCategorical cleaning:")
+print(f"  Airlines                    : {original_airlines} -> {cleaned_airlines}")
+print(f"  Source locations            : {original_source} -> {cleaned_source}")
+print(f"  Destination locations       : {original_destination} -> {cleaned_destination}")
+
+print("\nNumerical transformations:")
+print("  Price                       : Rs. strings -> float")
+print("  Distance_km                 : 'km' strings -> float")
+print("  Duration                    : mixed formats -> minutes")
+print("  Total_Stops                 : text -> number")
+print("  Passenger_Count             : words/numbers -> float")
+print("  Days_Before_Departure       : strings -> float")
+print("  Departure_Time              : mixed formats -> minutes")
+print("  Arrival_Time                : mixed formats -> minutes")
+
+print("\nMissing values:")
+print(f"  Before cleaning             : {original_missing}")
+print(f"  After cleaning              : {remaining_missing}")
+
+print("\n")
+print("=" * 60)
+print("                 MODEL PERFORMANCE")
+print("=" * 60)
+
+print(f"MSE                           : {mse:.2f}")
+print(f"RMSE                          : {rmse:.2f}")
+print(f"MAE                           : {mae:.2f}")
+print(f"R²                            : {r2:.4f}")
+print(f"Negative predictions          : {negative_predictions}")
+
+print("=" * 60)
 
 
 
