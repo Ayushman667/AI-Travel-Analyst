@@ -1,6 +1,11 @@
 import numpy as np
 from matplotlib import pyplot as plt
 import pandas as pd
+from pathlib import Path
+
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = BASE_DIR / "data"
 
 
 # ============================================================
@@ -8,7 +13,7 @@ import pandas as pd
 # ============================================================
 
 df = pd.read_csv(
-    "multiple_linear_regression/AI-Travel-Analyst/data/flight_pricing_dataset.csv"
+    DATA_DIR / "flight_pricing_dataset.csv"
 )
 
 
@@ -408,11 +413,7 @@ df = df.dropna(
 # SAVE CLEANED DATASET
 # ============================================================
 
-cleaned_file_path = (
-    "multiple_linear_regression/"
-    "AI-Travel-Analyst/data/"
-    "cleaned_flight_pricing_dataset.csv"
-)
+cleaned_file_path = DATA_DIR / "cleaned_flight_pricing_dataset.csv"
 
 df.to_csv(
     cleaned_file_path,
